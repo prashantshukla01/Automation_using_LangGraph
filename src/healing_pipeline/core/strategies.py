@@ -14,11 +14,14 @@ class RetryStrategy(RecoveryStrategy):
     """Implements exponential backoff retry logic."""
     
     def execute(self, context: dict):
-        wait_seconds = context.get('wait_seconds', 0)
+        base_wait = float(context.get('wait_seconds', 1))
+        retry_count = int(context.get('retry_count', 0))
+        # Exponential backoff with simple cap
+        wait_seconds = min(base_wait * (2 ** retry_count), 60)
         rationale = context.get('rationale', 'Retry initiated')
-        logger.info(f"Strategy: RETRY | Wait: {wait_seconds}s | Rationale: {rationale}")
+        logger.info(f"Strategy: RETRY | Wait: {wait_seconds}s | Rationale: {rationale} | retry_count: {retry_count}")
         time.sleep(wait_seconds)
-        log_healed_incident("TaxDataIngestor", "RETRY", f"Waited {wait_seconds}s")
+        log_healed_incident("TaxDataIngestor", "RETRY", f"Waited {wait_seconds}s (retry {retry_count})")
         return True
 
 class FailoverStrategy(RecoveryStrategy):
@@ -56,7 +59,15 @@ class StrategyFactory:
     
     @classmethod
     def get_strategy(cls, action_name: str) -> RecoveryStrategy:
-        strategy_class = cls._strategies.get(action_name.upper())
+        # Handle cases where action contains multiple options (e.g., "RETRY | FAILOVER | ESCALATE")
+        action_name = action_name.upper().strip()
+        
+        # If multiple options separated by |, pick the first one
+        if "|" in action_name:
+            actions = [a.strip() for a in action_name.split("|")]
+            action_name = actions[0]  # Use first suggested action
+        
+        strategy_class = cls._strategies.get(action_name)
         if strategy_class:
             return strategy_class()
         raise ValueError(f"Unknown recovery strategy: {action_name}")

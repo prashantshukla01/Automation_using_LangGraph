@@ -1,12 +1,13 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import ingest_node, analyze_node, heal_node
+from .nodes import ingest_node, analyze_node, heal_node, enrich_node
 from ..utils.logging import logger
 
 def should_heal(state: AgentState):
     """Conditional edge: success -> end, fail -> analyze."""
+    # If ingestion succeeded we proceed to enrichment (tax calc)
     if state['status'] == 'success':
-        return "end"
+        return "enrich"
     if state['retry_count'] >= state['max_retries']:
         return "end"
     return "analyze"
@@ -41,6 +42,7 @@ def create_healing_graph():
     
     # Add Nodes
     workflow.add_node("ingest", ingest_node)
+    workflow.add_node("enrich", enrich_node)
     workflow.add_node("analyze", analyze_node)
     workflow.add_node("heal", heal_node)
     
@@ -53,11 +55,27 @@ def create_healing_graph():
         should_heal,
         {
             "end": END,
-            "analyze": "analyze"
+            "analyze": "analyze",
+            "enrich": "enrich"
         }
     )
     
     workflow.add_edge("analyze", "heal")
+
+    # After enrichment, either finish (success) or analyze on validation failure
+    def should_validate(state: AgentState):
+        if state.get('status') == 'success':
+            return 'end'
+        return 'analyze'
+
+    workflow.add_conditional_edges(
+        "enrich",
+        should_validate,
+        {
+            "end": END,
+            "analyze": "analyze"
+        }
+    )
     
     workflow.add_conditional_edges(
         "heal",

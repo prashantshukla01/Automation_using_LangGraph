@@ -1,107 +1,177 @@
-from ..graph.state import AgentState
-from ..core.worker import TaxDataIngestor
-# Note: strategies.py can stay in core/strategies.py or move to graph/, sticking to core for now as per plan
+"""Graph node functions for the healing pipeline."""
+from ..config import settings
+from ..core.agent import AutomatedWatchdog
 from ..core.strategies import StrategyFactory
-from overrides import override
-from ..utils.logging import logger
-from ..core.agent import AutomatedWatchdog # We will refactor this later, but need to import for now or use interfaces
+from ..core.worker import TaxDataIngestor
+from ..graph.state import AgentState
+from ..utils.logging import logger, log_healed_incident, log_hard_failure
+from ..utils.tax_calculator import TaxCalculator
 
 # Ideally, we inject dependencies, but simple instantiation for now
 def ingest_node(state: AgentState) -> AgentState:
-    """
-    Executes the data ingestion.
-    """
+    """Ingest data from external API and handle transient failures."""
     ingestor = TaxDataIngestor(state['url'])
-    # Hack to sync simulation state if needed, or just let it fail naturally
-    # For simulation consistency, we might need a persistent ingestor instance if the state is transient
-    # But since this is a new node run, let's treat it as a fresh attempt unless we persist the worker object
-    
-    # IMPORTANT: The original worker has internal state `request_count` to simulate failure on 1st try.
-    # If we recreate it every time, it will ALWAYS fail.
-    # We need a way to persist the worker or pass request_count.
-    # For this refactor, let's pass the attempt count from state to the worker or modify worker to accept it.
-    
-    # Updating worker.py might be needed to handle this statelessness better.
-    # For now, let's rely on the worker's internal state if we can keep it alive, 
-    # BUT LangGraph nodes are functions.
-    
-    # A cleaner way: Update worker to take specific config for simulation control
-    # Or, we can store the ingestor in the state (not serializable usu. but works in memory)
-    # Let's assume we can modify TaxDataIngestor to accept 'simulate_failure' flag based on retry_count.
-    
+
+    # Control simulation of failures based on retry count
+    # (first attempt triggers simulated 429, subsequent attempts succeed)
     should_simulate_fail = (state['retry_count'] == 0)
     ingestor._simulate_failure = should_simulate_fail
-    # We also need to set request_count to 1 if we want it to trigger the fail logic
-    ingestor.request_count = 0 if should_simulate_fail else 1 
+    ingestor.request_count = 0 if should_simulate_fail else 1
 
     try:
-        result = ingestor.execute_ingestion() # This bumps request_count to 1
-        return {"status": "success", "error": None}
+        result = ingestor.execute_ingestion()
+        logger.info(f"Ingestion successful on attempt {state['retry_count'] + 1}")
+        return {
+            "status": "success",
+            "error": None,
+            "ingested_data": result.get('data') if isinstance(result, dict) else result
+        }
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")
         return {"status": "failed", "error": str(e)}
 
-def analyze_node(state: AgentState) -> AgentState:
+
+def enrich_node(state: AgentState) -> AgentState:
     """
-    Analyzes the error using the Watchdog (LangChain Agent).
+    Enriches ingested data by calculating tax via TaxJar and validating the result.
+    On validation failure, the state will be marked as failed so the analyze/heal loop runs.
     """
-    watchdog = AutomatedWatchdog() # This will be the refactored LangChain version
-    # Context needed for analysis
-    context = {"url": state['url'], "retry_count": state['retry_count']}
-    
+    # Try to obtain an order payload from ingestion; fall back to a demo order for testing
+    order = state.get('ingested_data')
+    if not order or not isinstance(order, dict):
+        # Demo order (same shape as tests/test_taxjar.py)
+        order = {
+          'from_country': 'US',
+          'from_zip': '92093',
+          'from_state': 'CA',
+          'from_city': 'La Jolla',
+          'from_street': '9500 Gilman Drive',
+          'to_country': 'US',
+          'to_zip': '90002',
+          'to_state': 'CA',
+          'to_city': 'Los Angeles',
+          'to_street': '1335 E 103rd St',
+          'amount': 15,
+          'shipping': 1.5,
+          'nexus_addresses': [
+            {
+              'id': 'Main Location',
+              'country': 'US',
+              'zip': '92093',
+              'state': 'CA',
+              'city': 'La Jolla',
+              'street': '9500 Gilman Drive'
+            }
+          ],
+          'line_items': [
+            {
+              'id': '1',
+              'quantity': 1,
+              'product_tax_code': '20010',
+              'unit_price': 15,
+              'discount': 0
+            }
+          ]
+        }
+
+    calculator = None
     try:
-        # We need to adapt analyze_error signature if we change it, assuming current sig for now
-        # The refactored agent will return the plan dict directly
-        plan = watchdog.analyze_error(Exception(state['error']), context) 
+        calculator = TaxCalculator()
+        tax_result = calculator.calculate_tax_for_order(order)
+        logger.info("✓ TaxJar API call successful")
+    except Exception as e:
+        logger.warning(f"TaxJar API failed ({type(e).__name__}), using mock result")
+        # Mock result for testing/offline scenarios
+        tax_result = {
+            'amount_to_collect': 1.46,
+            'order_total_amount': 16.5,
+            'has_nexus': True,
+            'jurisdictions': []
+        }
+
+    # Helper to extract attribute or key
+    def _get(obj, key):
+        if obj is None:
+            return None
+        if isinstance(obj, dict):
+            return obj.get(key)
+        return getattr(obj, key, None)
+
+    amount_to_collect = _get(tax_result, 'amount_to_collect')
+    order_total_amount = _get(tax_result, 'order_total_amount')
+
+    # Basic validation: order total should match amount + shipping + collected tax
+    expected_total = None
+    try:
+        expected_total = float(order.get('amount', 0)) + float(order.get('shipping', 0)) + float(amount_to_collect or 0)
+    except Exception:
+        expected_total = None
+
+    valid = False
+    if order_total_amount is not None and expected_total is not None:
+        try:
+            valid = abs(float(order_total_amount) - float(expected_total)) < 0.02
+        except Exception:
+            valid = False
+
+    if valid:
+        # Log successful validation and attach tax result
+        log_healed_incident("TaxCalculator", "VALIDATION", f"Tax validated. Collected: ${amount_to_collect}, Total: ${order_total_amount}")
+        return {"status": "success", "tax_result": tax_result, "healing_result": True}
+    else:
+        logger.error(f"Tax validation failed. expected=${expected_total} got=${order_total_amount}")
+        # Attach tax_result for debugging and trigger analysis/heal
+        return {"status": "failed", "error": "Tax validation failed", "tax_result": tax_result}
+
+
+def analyze_node(state: AgentState) -> AgentState:
+    """Analyze error and generate recovery plan using AI Watchdog."""
+    watchdog = AutomatedWatchdog()
+    context = {"url": state['url'], "retry_count": state['retry_count']}
+
+    try:
+        plan = watchdog.analyze_error(Exception(state['error']), context)
+        logger.info(f"Recovery plan generated: {plan.get('recovery_action', 'unknown')}")
         return {"plan": plan, "status": "healing"}
     except Exception as e:
-        logger.error(f"Analysis failed: {e}")
-        # Fallback plan
-        return {"plan": {"action": "retry", "wait_seconds": 5, "rationale": "Analysis failed"}, "status": "healing"}
+        logger.error(f"Analysis failed: {e}. Using fallback plan.")
+        return {
+            "plan": {"action": "retry", "wait_seconds": 1, "rationale": "Analysis failed, retry"},
+            "status": "healing"
+        }
 
 def heal_node(state: AgentState) -> AgentState:
-    """
-    Executes the healing plan.
-    """
+    """Execute recovery strategy based on the analysis plan."""
     plan = state['plan']
-    # Execute strategy
-    # StrategyFactory is in core/strategies.py
-    
-    # Mapping plan schema to strategy input
-    # Plan keys: error_category, recovery_action (or action), wait_seconds, rationale
-    action = plan.get('recovery_action') or plan.get('action') # handle potential schema mismatch
+    action = plan.get('recovery_action') or plan.get('action')
+
     if not action:
-        logger.error("No action in plan")
+        logger.error("No recovery action in plan")
         return {"healing_result": False, "status": "failed"}
-        
+
     try:
         strategy = StrategyFactory.get_strategy(action)
-        
         strategy_context = {
-            "wait_seconds": plan.get('wait_seconds', 0),
+            "wait_seconds": plan.get('wait_seconds', 1),
             "rationale": plan.get('rationale'),
-            "failover_url": settings.TAX_API_FAILOVER_URL if hasattr(settings, 'TAX_API_FAILOVER_URL') else "http://failover-api"
-            # Note: Need to import settings
+            "failover_url": getattr(settings, 'TAX_API_FAILOVER_URL', "http://failover-api"),
+            "retry_count": state.get('retry_count', 0)
         }
-        
+
         result = strategy.execute(strategy_context)
-        
-        # Check if strategy returned a URL update (e.g., Failover)
         state_update = {
-            "healing_result": result, 
-            "status": "healing_complete", 
+            "healing_result": result,
+            "status": "healing_complete",
             "retry_count": state['retry_count'] + 1
         }
-        
+
+        # Apply URL update if returned by failover strategy
         if isinstance(result, dict) and result.get("action") == "update_url":
             state_update["url"] = result["url"]
-            
+
         return state_update
-        
+
     except Exception as e:
         logger.error(f"Healing execution failed: {e}")
         return {"healing_result": False, "status": "failed"}
 
-        return {"healing_result": False, "status": "failed"}
-
-from ..config import settings

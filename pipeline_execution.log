@@ -1,0 +1,78 @@
+2026-01-31 18:30:29 | INFO     | healing_pipeline.core.engine:run:14 - Starting Pipeline Engine with LangGraph | Max Retries: 3
+2026-01-31 18:30:29 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #1 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:30:29 | WARNING  | healing_pipeline.core.worker:execute_ingestion:23 - Simulating 429 Rate Limit Error...
+2026-01-31 18:30:29 | ERROR    | healing_pipeline.graph.nodes:ingest_node:30 - Ingestion failed: 429 Client Error: Too Many Requests
+2026-01-31 18:30:29 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:30:29 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: 429 Client Error: Too Many Requests
+2026-01-31 18:30:30 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'string', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'The client is exceeding the rate limit, triggering a retry mechanism.'}
+2026-01-31 18:30:30 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:30:30 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 2.0s | Rationale: The client is exceeding the rate limit, triggering a retry mechanism. | retry_count: 0
+2026-01-31 18:30:32 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 2.0s (retry 0)
+2026-01-31 18:30:32 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:30:32 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:30:32 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:30:32 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 2
+2026-01-31 18:30:33 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:30:33 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:30:33 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:30:33 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: Tax validation failed
+2026-01-31 18:30:34 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'Tax validation failed', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'Tax validation failed, initiating retry and escalating.'}
+2026-01-31 18:30:34 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:30:34 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 4.0s | Rationale: Tax validation failed, initiating retry and escalating. | retry_count: 1
+2026-01-31 18:30:38 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 4.0s (retry 1)
+2026-01-31 18:30:38 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:30:38 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:30:38 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:30:38 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 3
+2026-01-31 18:30:39 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:30:39 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:30:39 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:30:39 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: Tax validation failed
+2026-01-31 18:30:41 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'Tax validation failed', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'The request failed to validate the tax, triggering a retry and escalation process.'}
+2026-01-31 18:30:41 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:30:41 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 8.0s | Rationale: The request failed to validate the tax, triggering a retry and escalation process. | retry_count: 2
+2026-01-31 18:30:49 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 8.0s (retry 2)
+2026-01-31 18:30:49 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:30:49 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:30:49 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:30:49 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 4
+2026-01-31 18:30:49 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:30:49 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:30:49 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:30:49 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: Tax validation failed
+2026-01-31 18:30:50 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'Tax validation failed', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'Tax validation failed, initiating retry and escalating.'}
+2026-01-31 18:30:50 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:30:51 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 16.0s | Rationale: Tax validation failed, initiating retry and escalating. | retry_count: 3
+2026-01-31 18:31:07 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 16.0s (retry 3)
+2026-01-31 18:31:07 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:31:07 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:31:07 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:31:07 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 5
+2026-01-31 18:31:07 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:31:07 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:31:08 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:31:08 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: Tax validation failed
+2026-01-31 18:31:09 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'Tax validation failed', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'Tax validation failed, initiating retry and escalating the issue.'}
+2026-01-31 18:31:09 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:31:09 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 32.0s | Rationale: Tax validation failed, initiating retry and escalating the issue. | retry_count: 4
+2026-01-31 18:31:41 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 32.0s (retry 4)
+2026-01-31 18:31:41 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:31:41 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:31:41 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:31:41 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 6
+2026-01-31 18:31:42 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:31:42 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:31:42 | INFO     | healing_pipeline.core.agent:__init__:55 - ✓ Watchdog initialized with Ollama (gemma3:1b)
+2026-01-31 18:31:42 | INFO     | healing_pipeline.core.agent:analyze_error:63 - Watchdog activated. Analyzing error: Tax validation failed
+2026-01-31 18:31:43 | INFO     | healing_pipeline.core.agent:analyze_error:82 - ✓ Ollama Watchdog Plan: {'error_category': 'Tax validation failed', 'recovery_action': 'RETRY | FAILOVER | ESCALATE', 'wait_seconds': 2, 'rationale': 'Tax validation failed, initiating retry and escalating.'}
+2026-01-31 18:31:43 | INFO     | healing_pipeline.graph.nodes:analyze_node:134 - Recovery plan generated: RETRY | FAILOVER | ESCALATE
+2026-01-31 18:31:43 | INFO     | healing_pipeline.core.strategies:execute:22 - Strategy: RETRY | Wait: 60s | Rationale: Tax validation failed, initiating retry and escalating. | retry_count: 5
+2026-01-31 18:32:43 | SUCCESS  | healing_pipeline.utils.logging:log_healed_incident:25 - HEALED | Component: TaxDataIngestor | Strategy: RETRY | Details: Waited 60s (retry 5)
+2026-01-31 18:32:43 | INFO     | healing_pipeline.core.worker:execute_ingestion:19 - Attempting ingestion Request #2 to https://jsonplaceholder.typicode.com/todos/1
+2026-01-31 18:32:43 | INFO     | healing_pipeline.core.worker:execute_ingestion:40 - Executing REAL network request...
+2026-01-31 18:32:43 | INFO     | healing_pipeline.core.worker:execute_ingestion:44 - API Call Successful. Data Ingested.
+2026-01-31 18:32:43 | INFO     | healing_pipeline.graph.nodes:ingest_node:23 - Ingestion successful on attempt 7
+2026-01-31 18:32:43 | WARNING  | healing_pipeline.graph.nodes:enrich_node:83 - TaxJar API failed (TaxJarResponseError), using mock result
+2026-01-31 18:32:43 | ERROR    | healing_pipeline.graph.nodes:enrich_node:122 - Tax validation failed. expected=$1.46 got=$16.5
+2026-01-31 18:32:43 | CRITICAL | healing_pipeline.core.engine:run:45 - Graph Execution Error: Recursion limit of 25 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.
+For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT

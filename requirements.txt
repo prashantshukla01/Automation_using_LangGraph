@@ -8,3 +8,4 @@ google-generativeai>=0.7.0
 langchain
 langgraph
 langchain-google-genai
+taxjar
