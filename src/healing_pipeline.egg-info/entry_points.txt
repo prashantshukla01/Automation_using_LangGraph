@@ -1,0 +1,2 @@
+[console_scripts]
+healing-run = healing_pipeline.cli:main

@@ -1,0 +1,7 @@
+requests
+loguru
+python-dotenv
+openai
+pydantic-settings
+click
+google-generativeai

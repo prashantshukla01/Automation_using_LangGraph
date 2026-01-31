@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: healing_pipeline
+Version: 0.1.0
+Summary: Self-Healing Automation Pipeline
+Author: Prashant Shukla
+Requires-Python: >=3.10
+Requires-Dist: requests
+Requires-Dist: loguru
+Requires-Dist: python-dotenv
+Requires-Dist: openai
+Requires-Dist: pydantic-settings
+Requires-Dist: click
+Requires-Dist: google-generativeai
