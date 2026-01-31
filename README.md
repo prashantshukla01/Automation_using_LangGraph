@@ -44,14 +44,14 @@ An intelligent, resilient automation system that autonomously recovers from tran
 │  Validation)     │         │              │
 └────────┬─────────┘         └──────┬───────┘
          │                          │
-      ✓/✗                          │
+      ✓/✗                           │
          │◄─────────────────────────┘
          │
     ┌────┴─────┐
-    │           │
-   ✅          ⚠️
- SUCCESS     MAX_RETRIES
-  (Logged)   (Escalate)
+    │          │
+   ✅         ⚠️
+ SUCCESS    MAX_RETRIES
+(Logged)    (Escalate)
 ```
 
 ### Workflow Stages
